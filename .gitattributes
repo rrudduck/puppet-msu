@@ -1,0 +1,3 @@
+*.rb  diff=ruby
+*.rb  text
+*.md  text
