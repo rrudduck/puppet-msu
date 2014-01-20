@@ -5,6 +5,7 @@
 *.old
 *.gem
 *.rbc
+*.msu
 .bundle
 .config
 .yardoc
