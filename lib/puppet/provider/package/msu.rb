@@ -9,7 +9,7 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
 
     has_feature :installable, :uninstallable
 
-    commands :wsua => 'C:/Windows/Sysnative/wsua.exe'
+    commands :wsua => 'C:/Windows/Sysnative/wusa.exe'
 
     def print
         notice("${name} ${source}")
@@ -17,14 +17,14 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
 
     def install
         # wsua.exe /quiet /norestart <msu file>
-        args = '/quiet', '/norestart', @resource[:source]
+        args =  @resource[:source], '/quiet', '/norestart'
 
         wsua(*args)
     end
 
     def uninstall
         # wsua.exe /quiet /norestart /uninstall <msu file or kb>
-        args = '/quiet', '/norestart', '/uninstall', '/kb'
+        args = '/uninstall', '/kb'
 
         if @resource[:name].downcase.start_with? 'kb'
             args << @resource[:name]
@@ -32,34 +32,42 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
             raise Puppet::Error, 'name should start with kb'
         end
 
+        args.push '/quiet', '/norestart'
+
         wsua(*args)
     end
 
     def query
-        self.class.instances.each do |p|
-            return p.properties if @resource[:name].downcase == p.name.downcase
-        end
-        nil
+        res = self.class.query_wmi(@resource[:name])
+        res.first.properties unless res.nil? or res.empty?
     end
 
-    def self.instances    
-        query_registry
+    def self.instances 
+        query_wmi
     end
 
-    # This is probably the safer method, but it is quite a bit slower
-    def self.query_wmi
+    # WMI method <- preferred way
+    def self.query_wmi(id = nil)
         packages = []
 
         wmi = WIN32OLE.connect('winmgmts://')
 
-        hotfixes = wmi.ExecQuery('select * from win32_quickfixengineering')
+        if id
+            query = "select * from win32_quickfixengineering where HotFixID = '#{id}'"
+        else
+            query = 'select * from win32_quickfixengineering'
+        end
+
+        hotfixes = wmi.ExecQuery(query)
 
         hotfixes.each do |hotfix|
             packages << new({ :name => hotfix.HotFixID.downcase, :ensure => :present, :provider => self.name  })
         end
+
+        packages
     end
 
-    # Faster method, although a bit more work that using wmi (and possibly could miss a package)
+    # Registry method
     def self.query_registry
         packages = []
 
@@ -69,12 +77,10 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
         Win32::Registry::HKEY_LOCAL_MACHINE.open(key, access) do |reg|
             reg.each_key do |k|
                 reg.open(k, access) do |subkey|
-                    if subkey['InstallClient'] == 'WindowsUpdateAgent'
-                        k.split('~')[0].split('_').each do |p|
-                            if p.downcase.start_with? 'kb'
-                                packages << new({ :name => p, :ensure => :present, :provider => self.name  })
-                                break
-                            end
+                    k.split('~')[0].split('_').each do |p|
+                        if p.downcase.start_with? 'kb'
+                            packages << new({ :name => p.downcase, :ensure => :present, :provider => self.name  })
+                            break
                         end
                     end
                 end
