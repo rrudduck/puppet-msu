@@ -1,0 +1,8 @@
+name          'rrudduck-msu'
+version       '0.1.0'
+source        'https://github.com/rrudduck/puppet-msu'
+author        'rrudduck'
+license       'MIT'
+summary       'msu package provider for puppet'
+description   'msu package provider for puppet'
+project_page  'https://github.com/rrudduck/puppet-msu'
