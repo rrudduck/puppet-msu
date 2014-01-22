@@ -1,4 +1,9 @@
 require 'puppet/provider/package'
+require 'win32ole' if Puppet.features.microsoft_windows?
+require 'win32/registry' if Puppet.features.microsoft_windows?
+
+# MSU Provider for the Package Resource
+# http://support.microsoft.com/kb/934307
 
 Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package do
     desc "msu package provider for windows"
@@ -8,14 +13,6 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
     has_feature :installable, :uninstallable
 
     commands :wsua => 'C:/Windows/Sysnative/wusa.exe'
-
-    # Moved these here to prevent them from being loaded on linux machines.
-    require 'win32ole'
-    require 'win32/registry'
-
-    def print
-        notice("${name} ${source}")
-    end
 
     def install
         # wsua.exe /quiet /norestart <msu file>
