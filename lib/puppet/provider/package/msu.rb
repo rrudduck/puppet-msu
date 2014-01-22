@@ -44,11 +44,15 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
 
         output = execute(command, :failonfail => false, :combine => true)
 
-        check_result(output.exitstatus)
+        check_result(output)
     end
 
-    def check_result(hr)
+    def check_result(output)
         operation = resource[:ensure] == :absent ? 'uninstall' : 'install'
+
+        # Hack for error: undefined method `exitstatus' for "":String
+        # Possibly something to do with wusa or puppet exec
+        hr = output.respond_to?(:exitstatus) ? output.exitstatus : 0
 
         case hr
             when self.class::ERROR_SUCCESS
@@ -64,6 +68,7 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
 
     def query
         res = self.class.query_wmi(@resource[:name])
+        
         res.first.properties unless res.nil? or res.empty?
     end
 
