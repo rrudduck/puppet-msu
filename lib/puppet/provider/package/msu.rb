@@ -1,6 +1,6 @@
 require 'puppet/provider/package'
+require 'puppet/util/windows'
 require 'win32ole' if Puppet.features.microsoft_windows?
-require 'win32/registry' if Puppet.features.microsoft_windows?
 
 # MSU Provider for the Package Resource
 # http://support.microsoft.com/kb/934307
@@ -12,13 +12,16 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
 
     has_feature :installable, :uninstallable
 
-    commands :wsua => 'C:/Windows/Sysnative/wusa.exe'
+    self::ERROR_SUCCESS                  = 0
+    self::ERROR_SUCCESS_REBOOT_INITIATED = 1641
+    self::ERROR_SUCCESS_REBOOT_REQUIRED  = 3010
+    self::WSUA                           = 'C:/Windows/Sysnative/wusa.exe'
 
     def install
         # wsua.exe /quiet /norestart <msu file>
         args =  @resource[:source], '/quiet', '/norestart'
 
-        wsua(*args)
+        exec(args)
     end
 
     def uninstall
@@ -33,7 +36,30 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
 
         args.push '/quiet', '/norestart'
 
-        wsua(*args)
+        exec(args)
+    end
+
+    def exec(args)
+        command = [self.class::WSUA, args].flatten.compact.join(' ')
+
+        output = execute(command, :failonfail => false, :combine => true)
+
+        check_result(output.exitstatus)
+    end
+
+    def check_result(hr)
+        operation = resource[:ensure] == :absent ? 'uninstall' : 'install'
+
+        case hr
+            when self.class::ERROR_SUCCESS
+                # do nothing
+            when self.class::ERROR_SUCCESS_REBOOT_INITIATED
+                warning("The package #{operation}ed successfully and the system is rebooting now.")
+            when self.class::ERROR_SUCCESS_REBOOT_REQUIRED
+                warning("The package #{operation}ed successfully, but the system must be rebooted.")
+            else
+                raise Puppet::Util::Windows::Error.new("Failed to #{operation}", hr)
+        end
     end
 
     def query
@@ -45,7 +71,6 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
         query_wmi
     end
 
-    # WMI method <- preferred way
     def self.query_wmi(id = nil)
         packages = []
 
@@ -61,29 +86,6 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
 
         hotfixes.each do |hotfix|
             packages << new({ :name => hotfix.HotFixID.downcase, :ensure => :present, :provider => self.name  })
-        end
-
-        packages
-    end
-
-    # Registry method
-    def self.query_registry
-        packages = []
-
-        key = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\Packages'
-        access = Win32::Registry::KEY_READ | 0x100
-
-        Win32::Registry::HKEY_LOCAL_MACHINE.open(key, access) do |reg|
-            reg.each_key do |k|
-                reg.open(k, access) do |subkey|
-                    k.split('~')[0].split('_').each do |p|
-                        if p.downcase.start_with? 'kb'
-                            packages << new({ :name => p.downcase, :ensure => :present, :provider => self.name  })
-                            break
-                        end
-                    end
-                end
-            end
         end
 
         packages

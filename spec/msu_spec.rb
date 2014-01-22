@@ -38,7 +38,7 @@ describe provider do
 		it 'should use source' do
 			@resource[:source] = 'c:\install\package.msu'
 			@resource[:ensure] = :present
-			@provider.expects(:wsua).with 'c:\install\package.msu', '/quiet', '/norestart'
+			@provider.expects(:exec).with 'c:\install\package.msu', '/quiet', '/norestart',
 			@provider.install
 		end
 	end
@@ -47,7 +47,7 @@ describe provider do
 		it 'should uninstall correctly if provided a kb number' do
 			@resource[:name] = 'kb1234'
 			@resource[:ensure] = :absent
-			@provider.expects(:wsua).with '/uninstall', '/kb', 'kb1234', '/quiet', '/norestart', 
+			@provider.expects(:exec).with '/uninstall', '/kb', 'kb1234', '/quiet', '/norestart', 
 			@provider.uninstall
 		end
 
