@@ -15,7 +15,7 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
     self::ERROR_SUCCESS                  = 0
     self::ERROR_SUCCESS_REBOOT_INITIATED = 1641
     self::ERROR_SUCCESS_REBOOT_REQUIRED  = 3010
-    self::WSUA                           = 'C:/Windows/Sysnative/wusa.exe'
+    self::WSUA                           = "#{Facter['system32'].value}/wusa.exe"
 
     def install
         # wsua.exe /quiet /norestart <msu file>
