@@ -7,6 +7,8 @@ require 'win32ole' if Puppet.features.microsoft_windows?
 
 Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package do
     desc "msu package provider for windows"
+    
+    system32 = Facter.value('system32')
 
     confine :operatingsystem => :windows
 
@@ -15,7 +17,7 @@ Puppet::Type.type(:package).provide :msu, :parent => Puppet::Provider::Package d
     self::ERROR_SUCCESS                  = 0
     self::ERROR_SUCCESS_REBOOT_INITIATED = 1641
     self::ERROR_SUCCESS_REBOOT_REQUIRED  = 3010
-    self::WSUA                           = "#{Facter['system32'].value}/wusa.exe"
+    self::WSUA                           = "#{system32}/wusa.exe"
 
     def install
         # wsua.exe /quiet /norestart <msu file>
